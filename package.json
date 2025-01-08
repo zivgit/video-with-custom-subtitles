@@ -1,0 +1,32 @@
+{
+	"name": "video-with-custom-subtitles",
+	"version": "1.0.0",
+	"description": "支持自定义字幕功能的视频 Web Component",
+	"main": "./out/videoWithCustomSubtitles.js",
+	"dependencies": {},
+	"devDependencies": {
+		"typescript": "^5.7.2"
+	},
+	"scripts": {
+		"watch": "tsc -watch -p ./",
+		"compile": "tsc -p ./",
+		"test": "echo \"Error: no test specified\" && exit 1"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/zivgit/video-with-custom-subtitles.git"
+	},
+	"keywords": [
+		"web-component",
+		"video-player",
+		"custom-video",
+		"custom-video-player",
+		"web-components-library"
+	],
+	"author": "Zhang Mengmin",
+	"license": "MIT",
+	"bugs": {
+		"url": "https://github.com/zivgit/video-with-custom-subtitles/issues"
+	},
+	"homepage": "https://github.com/zivgit/video-with-custom-subtitles#readme"
+}
