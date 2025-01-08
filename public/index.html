@@ -4,21 +4,26 @@
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<title>Example</title>
-		<!-- customElement: video-with-custom-subtitles -->
-		<script src="/out/videoWithCustomSubtitles.js" defer></script>
 		<style>
 			video-with-custom-subtitles {
 				width: 1000px;
 			}
 			video-with-custom-subtitles::part(video) {
-				border: 4px solid navy;
+				border: 2px solid darkgray;
 			}
 		</style>
+		<!-- customElement: video-with-custom-subtitles -->
+		<script src="/out/videoWithCustomSubtitles.js" defer></script>
 	</head>
 	<body>
-		<video-with-custom-subtitles controls poster="/src/assets/big_buck_bunny_poster.jpg">
+		<video-with-custom-subtitles
+			controls
+			autoplay
+			muted
+			poster="/src/assets/big_buck_bunny_poster.jpg"
+		>
 			<source src="/src/assets/big_buck_bunny_720p_surround.mp4" type="video/mp4" />
-			<track default kind="captions" srclang="en" src="/src/assets/big_buck_bunny.vtt" />
+			<track default kind="captions" srclang="cn" src="/src/assets/big_buck_bunny.vtt" />
 
 			Download the
 			<a href="/src/assets/big_buck_bunny_720p_surround.mp4">MP4</a>
