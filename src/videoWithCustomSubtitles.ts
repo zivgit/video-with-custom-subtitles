@@ -7,6 +7,7 @@ customElements.define(
 	class extends HTMLElement {
 		private styleElement: HTMLStyleElement;
 		private videoElement: HTMLVideoElement;
+		private videoSlot: HTMLSlotElement;
 		private videoScreen: HTMLElement;
 		private playButton: HTMLSpanElement;
 		private muteButton: HTMLSpanElement;
@@ -34,6 +35,7 @@ customElements.define(
 
 			this.styleElement = document.createElement("style");
 			this.videoElement = document.createElement("video");
+			this.videoSlot = document.createElement("slot");
 			this.videoScreen = document.createElement("div");
 			this.playButton = document.createElement("span");
 			this.muteButton = document.createElement("span");
@@ -81,6 +83,7 @@ customElements.define(
 
 			// 使用 ::part 伪类暴露样式接口
 			this.videoElement.setAttribute("part", "video");
+			this.videoElement.appendChild(this.videoSlot);
 			// videoScreen
 			this.videoScreen.setAttribute("part", "videoScreen");
 			// playButton
@@ -112,6 +115,15 @@ customElements.define(
 			shadowRoot.appendChild(this.videoInfoBox);
 			shadowRoot.appendChild(this.contextMenu);
 
+			this.videoSlot.addEventListener("slotchange", (ev: Event) => {
+				const target = ev.target as HTMLSlotElement; // 类型断言
+				// 获取分发的节点
+				const assignedNodes = target.assignedNodes();
+				assignedNodes.forEach((node) => {
+					this.videoElement.appendChild(node);
+				});
+			});
+
 			this.videoElement.addEventListener("click", () => {
 				if (this.videoElement.paused) {
 					this.videoElement.play();
@@ -138,10 +150,22 @@ customElements.define(
 				this.playButton.innerText = "\u{25B6}";
 			});
 
-			// 监听 volumechange 事件
-			this.videoElement.addEventListener("volumechange", (ev: Event) => {
+			// 元数据（metadata）加载完成事件
+			this.videoElement.addEventListener("loadedmetadata", (ev: Event) => {
 				const target = ev.target as HTMLVideoElement; // 类型断言
-				this.muteButton.textContent = target.muted ? "\u{1F507}" : "\u{1F50A}";
+				const track = target.textTracks[0] as TextTrack | null; // 获取第一个字幕轨道
+				if (track) {
+					this.extTrack(track);
+				}
+
+				if (!isNaN(target.duration)) {
+					const updateTarget = this.videoInfoBox.querySelector(
+						'li[data-role="duration"] span'
+					);
+					if (updateTarget) {
+						updateTarget.textContent = this.formatSeconds(target.duration);
+					}
+				}
 			});
 
 			// 更新进度条
@@ -158,16 +182,10 @@ customElements.define(
 				}
 			});
 
-			this.videoElement.addEventListener("loadedmetadata", (ev: Event) => {
+			// 监听 volumechange 事件
+			this.videoElement.addEventListener("volumechange", (ev: Event) => {
 				const target = ev.target as HTMLVideoElement; // 类型断言
-				if (!isNaN(target.duration)) {
-					const updateTarget = this.videoInfoBox.querySelector(
-						'li[data-role="duration"] span'
-					);
-					if (updateTarget) {
-						updateTarget.textContent = this.formatSeconds(target.duration);
-					}
-				}
+				this.muteButton.textContent = target.muted ? "\u{1F507}" : "\u{1F50A}";
 			});
 
 			// 右键点击时显示自定义菜单
@@ -254,17 +272,6 @@ customElements.define(
 						// 如果是自定义属性或非 DOM 属性，使用 setAttribute
 						this.videoElement.setAttribute(name, value || "true");
 					}
-				}
-
-				// 将宿主元素的所有子元素移植到 video 元素内
-				for (const node of Array.from(this.childNodes)) {
-					this.videoElement.appendChild(node.cloneNode());
-				}
-
-				// 获取第一个字幕轨道
-				const track = this.videoElement.textTracks[0] as TextTrack | null;
-				if (track) {
-					this.extTrack(track);
 				}
 
 				this.muteButton.textContent = this.videoElement.muted ? "\u{1F507}" : "\u{1F50A}";
