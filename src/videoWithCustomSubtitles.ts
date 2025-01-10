@@ -20,6 +20,10 @@ customElements.define(
 
 		private isUpdatedCues: boolean = false;
 
+		static get observedAttributes() {
+			return Object.getOwnPropertyNames(HTMLMediaElement.prototype);
+		}
+
 		private get videoInfoBoxVisible(): boolean {
 			return this.videoInfoBox.style.display === "unset";
 		}
@@ -46,8 +50,8 @@ customElements.define(
 
 			this.styleElement.textContent = [
 				`:host { display: inline-block; position: relative; }`,
-				`:host(:hover) .fade-out { opacity: 1; }`,
-				`:host(:not(:hover)) .fade-out { opacity: 0; transition-delay: 1s; }`,
+				`:host(:hover) .fade-in-out { opacity: 1; }`,
+				`:host(:not(:hover)) .fade-in-out { opacity: 0; transition-delay: 1s; }`,
 				`video { vertical-align: top; width: 100%; height: 100%; box-sizing: border-box; background-color: var(--video-bg-color, black); }`,
 				`video::cue { font-size: 75%; font-family: Arial, sans-serif; line-height: 2em; text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.7); background-color: rgba(0, 0, 0, 0.5); outline: 4px solid rgba(0, 0, 0, 0.5); }`,
 				`menu { position: absolute; min-width: 120px; list-style-type: none; margin: 0; padding: 8px 0; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3); background-color: rgb(25, 29, 23); border: 0; border-radius: 8px; overflow: hidden; }`,
@@ -66,7 +70,7 @@ customElements.define(
 				`[popover]:popover-open { opacity: 1; transform: scale(1); }`,
 				`[popover] { opacity: 0; transform: scale(0.9); transition-property: opacity, transform, overlay, display; transition-duration: 0.2s; transition-behavior: allow-discrete; }`,
 				`@starting-style { [popover]:popover-open { opacity: 0; transform: scale(0.9); } }`,
-				`.fade-out { opacity: 0; transition: opacity 0.5s ease; }`,
+				`.fade-in-out { opacity: 0; transition: opacity 0.5s ease; }`,
 			].join("\n");
 
 			this.videoInfoBox.innerHTML = [
@@ -84,22 +88,22 @@ customElements.define(
 			// 使用 ::part 伪类暴露样式接口
 			this.videoElement.setAttribute("part", "video");
 			this.videoElement.appendChild(this.videoSlot);
-			// videoScreen
+
 			this.videoScreen.setAttribute("part", "videoScreen");
-			// playButton
+
 			this.playButton.setAttribute("part", "playButton");
-			// muteButton
+
 			this.muteButton.setAttribute("part", "muteButton");
-			this.muteButton.classList.add("fade-out");
-			// videoInfoBox
+			this.muteButton.classList.add("fade-in-out");
+
 			this.videoInfoBox.setAttribute("part", "videoInfoBox");
-			// contextMenu
+
 			this.contextMenu.setAttribute("part", "contextMenu");
 			this.contextMenu.popover = "auto";
-			// controlBar
+
 			this.controlBar.setAttribute("part", "controlBar");
-			this.controlBar.classList.add("fade-out");
-			// progressBar
+			this.controlBar.classList.add("fade-in-out");
+
 			this.progressBar.setAttribute("part", "progressBar");
 			this.progressBar.type = "range";
 			this.progressBar.min = "0";
@@ -115,197 +119,217 @@ customElements.define(
 			shadowRoot.appendChild(this.videoInfoBox);
 			shadowRoot.appendChild(this.contextMenu);
 
-			this.videoSlot.addEventListener("slotchange", (ev: Event) => {
-				const target = ev.target as HTMLSlotElement; // 类型断言
-				// 获取分发的节点
-				const assignedNodes = target.assignedNodes();
-				assignedNodes.forEach((node) => {
-					this.videoElement.appendChild(node);
-				});
-			});
-
-			this.videoElement.addEventListener("click", () => {
-				if (this.videoElement.paused) {
-					this.videoElement.play();
-				} else {
-					this.videoElement.pause();
-				}
-			});
-
-			this.videoElement.addEventListener("dblclick", () => {
-				if (document.fullscreenElement) {
-					this.exitFullScreen();
-				} else {
-					this.enterFullScreen(this);
-				}
-			});
-
-			// 播放事件
-			this.videoElement.addEventListener("play", () => {
-				this.playButton.innerText = ""; // '\u{23F8}'
-			});
-
-			// 暂停事件
-			this.videoElement.addEventListener("pause", () => {
-				this.playButton.innerText = "\u{25B6}";
-			});
-
-			// 元数据（metadata）加载完成事件
-			this.videoElement.addEventListener("loadedmetadata", (ev: Event) => {
-				const target = ev.target as HTMLVideoElement; // 类型断言
-				const track = target.textTracks[0] as TextTrack | null; // 获取第一个字幕轨道
-				if (track) {
-					this.extTrack(track);
-				}
-
-				if (!isNaN(target.duration)) {
-					const updateTarget = this.videoInfoBox.querySelector(
-						'li[data-role="duration"] span'
-					);
-					if (updateTarget) {
-						updateTarget.textContent = this.formatSeconds(target.duration);
-					}
-				}
-			});
-
-			// 更新进度条
-			this.videoElement.addEventListener("timeupdate", (ev: Event) => {
-				const target = ev.target as HTMLVideoElement; // 类型断言
-				const progress = (target.currentTime / target.duration) * 100;
-				this.progressBar.value = progress.toString();
-
-				const updateTarget = this.videoInfoBox.querySelector(
-					'li[data-role="currentTime"] span'
-				);
-				if (updateTarget) {
-					updateTarget.textContent = this.formatSeconds(target.currentTime);
-				}
-			});
-
-			// 监听 volumechange 事件
-			this.videoElement.addEventListener("volumechange", (ev: Event) => {
-				const target = ev.target as HTMLVideoElement; // 类型断言
-				this.muteButton.textContent = target.muted ? "\u{1F507}" : "\u{1F50A}";
-			});
-
-			// 右键点击时显示自定义菜单
-			this.videoElement.addEventListener("contextmenu", (ev: MouseEvent) => {
-				ev.preventDefault(); // 防止默认右键菜单
-				const x = ev.pageX; // 获取点击位置的X坐标
-				const y = ev.pageY; // 获取点击位置的Y坐标
-				this.contextMenu.style.left = `${x}px`; // 设置自定义菜单的X位置
-				this.contextMenu.style.top = `${y}px`; // 设置自定义菜单的Y位置
-				this.contextMenu.showPopover();
-			});
-
-			// 菜单事件代理
-			this.contextMenu.addEventListener("click", (ev: Event) => {
-				const target = ev.target as HTMLLIElement; // 类型断言
-				// 确保点击的是 <li> 元素
-				if (target.tagName.toLowerCase() === "li") {
-					// 获取自定义的 data-action 属性
-					const action = target.getAttribute("data-action");
-					// 根据 data-action 值进行不同的操作
-					switch (action) {
-						case "loop": {
-							target.classList.toggle("active");
-							this.videoElement.loop = !this.videoElement.loop;
-							break;
-						}
-						case "save":
-							this.downloadVideo(this.videoElement.currentSrc);
-							break;
-						case "details":
-							target.classList.toggle("active");
-							this.videoInfoBoxVisible = !this.videoInfoBoxVisible;
-							break;
-						default:
-							break;
-					}
-
-					// 隐藏菜单
-					setTimeout(() => this.contextMenu.hidePopover(), 100);
-				}
-			});
-
-			// 用户拖动进度条时更新视频播放时间
-			this.progressBar.addEventListener("input", (ev: Event) => {
-				const target = ev.target as HTMLInputElement; // 类型断言
-				const value = Number(target.value);
-				const seekTime = (value / 100) * this.videoElement.duration;
-				this.videoElement.currentTime = seekTime;
-			});
-
-			this.progressBar.addEventListener("click", (ev: Event) => {
-				ev.stopPropagation();
-			});
-
-			this.muteButton.addEventListener("click", (ev: Event) => {
-				ev.stopPropagation();
-				this.videoElement.muted = !this.videoElement.muted;
-			});
-
 			// 使用 ResizeObserver 监听容器的 resize 事件
-			this.resizeObserver = new ResizeObserver(this.handleResizeObserverCallback.bind(this));
+			this.resizeObserver = new ResizeObserver(this.handleResizeObserverCallback);
 		}
 
 		// 生命周期钩子 - 元素添加到 DOM 时触发
 		connectedCallback() {
-			if (this.shadowRoot) {
-				// 观察 shadow DOM 内部的元素（container）
-				this.resizeObserver.observe(this.videoElement);
-
-				// 将宿主元素的所有属性移植到 video 元素上
-				for (const { name, value } of Array.from(this.attributes)) {
-					if (name in this.videoElement) {
-						if ("controls" === name) {
-							// 覆盖原始 controls
-							this.videoElement.controls = false;
-							if (value !== "false") {
-								this.appendControls();
-							}
-						} else {
-							// 如果是 DOM 属性，直接赋值
-							(this.videoElement as Record<string, any>)[name] = value || true;
-						}
-					} else {
-						// 如果是自定义属性或非 DOM 属性，使用 setAttribute
-						this.videoElement.setAttribute(name, value || "true");
-					}
-				}
-
-				this.muteButton.textContent = this.videoElement.muted ? "\u{1F507}" : "\u{1F50A}";
-
-				if (this.videoElement.loop) {
-					this.contextMenu
-						.querySelector('li[data-action="loop"]')
-						?.classList.add("active");
-				}
-			}
+			// 视频插槽
+			this.videoSlot.addEventListener("slotchange", this.videoSlotchangeEventHandler); // 插槽变更事件
+			// 视频
+			this.videoElement.addEventListener("click", this.videoClickEventHandler); // 单击事件
+			this.videoElement.addEventListener("dblclick", this.videoDblclickEventHandler); // 双击事件
+			this.videoElement.addEventListener("play", this.videoPlayEventHandler); // 播放事件
+			this.videoElement.addEventListener("pause", this.videoPauseEventHandler); // 暂停事件
+			this.videoElement.addEventListener("loadedmetadata", this.videoLoadedmetadataEventHandler); // 元数据（metadata）加载完成事件
+			this.videoElement.addEventListener("timeupdate", this.videoTimeupdateEventHandler); // 更新进度条
+			this.videoElement.addEventListener("volumechange", this.videoVolumechangeEventHandler); // 音量（volumechange）变更事件
+			this.videoElement.addEventListener("contextmenu", this.videoContextmenuEventHandler); // 右键点击时显示自定义菜单
+			// 右键菜单
+			this.contextMenu.addEventListener("click", this.contextMenuClickEventHandler); // 单击事件
+			// 进度条
+			this.progressBar.addEventListener("input", this.progressBarInputEventHandler); // 输入事件
+			// 静音按钮
+			this.muteButton.addEventListener("click", this.muteButtonClickEventHandler); // 单击事件
 		}
 
 		// 生命周期钩子 - 元素从 DOM 中移除时触发
-		disconnectedCallback(name: any, oldValue: any, newValue: any) {
-			console.log(`Attribute ${name} changed from ${oldValue} to ${newValue}`);
+		disconnectedCallback() {
+			this.videoSlot.removeEventListener("slotchange", this.videoSlotchangeEventHandler);
+			this.videoElement.removeEventListener("click", this.videoClickEventHandler);
+			this.videoElement.removeEventListener("dblclick", this.videoDblclickEventHandler);
+			this.videoElement.removeEventListener("play", this.videoPlayEventHandler);
+			this.videoElement.removeEventListener("pause", this.videoPauseEventHandler);
+			this.videoElement.removeEventListener("loadedmetadata", this.videoLoadedmetadataEventHandler);
+			this.videoElement.removeEventListener("timeupdate", this.videoTimeupdateEventHandler);
+			this.videoElement.removeEventListener("volumechange", this.videoVolumechangeEventHandler);
+			this.videoElement.removeEventListener("contextmenu", this.videoContextmenuEventHandler);
+			this.contextMenu.removeEventListener("click", this.contextMenuClickEventHandler);
+			this.progressBar.removeEventListener("input", this.progressBarInputEventHandler);
+			this.muteButton.removeEventListener("click", this.muteButtonClickEventHandler);
+
 			// 当元素从 DOM 移除时，清理 ResizeObserver
 			this.resizeObserver.disconnect();
 		}
 
-		appendControls() {
-			if (this.shadowRoot) {
-				this.shadowRoot.appendChild(this.controlBar);
-				this.controlBar.appendChild(this.progressBar);
+		attributeChangedCallback(name: string, oldValue: any, newValue: any) {
+			// 将宿主元素的所有属性移植到 video 元素上
+			if (name in this.videoElement) {
+				switch (name) {
+					case "controls":
+						if (newValue === "false") {
+							this.removeControls();
+						} else {
+							this.appendControls();
+						}
+						// 覆盖原始 controls
+						this.videoElement.controls = false;
+						return;
+					case "muted":
+						this.muteButton.textContent = newValue === "false" ? "\u{1F50A}" : "\u{1F507}";
+						break;
+					case "loop":
+						if (newValue !== "false") {
+							this.contextMenu.querySelector('li[data-action="loop"]')?.classList.add("active");
+						}
+						break;
+					default:
+						break;
+				}
+
+				// 如果是 DOM 属性，直接赋值
+				(this.videoElement as Record<string, any>)[name] = newValue || true;
+			} else {
+				// 如果是自定义属性或非 DOM 属性，使用 setAttribute
+				this.videoElement.setAttribute(name, newValue || "true");
 			}
 		}
 
-		handleResizeObserverCallback(entries: ResizeObserverEntry[]) {
+		// 视频插槽 - 变更事件
+		videoSlotchangeEventHandler = (ev: Event) => {
+			const target = ev.target as HTMLSlotElement; // 类型断言
+			// 获取分发的节点
+			const assignedNodes = target.assignedNodes();
+			assignedNodes.forEach((node) => {
+				this.videoElement.appendChild(node);
+			});
+		};
+
+		// 视频 - 单击事件
+		videoClickEventHandler = () => {
+			if (this.videoElement.paused) {
+				this.videoElement.play();
+			} else {
+				this.videoElement.pause();
+			}
+		};
+
+		// 视频 - 双击事件
+		videoDblclickEventHandler = () => {
+			if (document.fullscreenElement) {
+				this.exitFullScreen();
+			} else {
+				this.enterFullScreen(this);
+			}
+		};
+
+		// 视频 - 播放事件
+		videoPlayEventHandler = () => {
+			this.playButton.innerText = ""; // '\u{23F8}'
+		};
+
+		// 视频 - 暂停事件
+		videoPauseEventHandler = () => {
+			this.playButton.innerText = "\u{25B6}";
+		};
+
+		// 视频 - 元数据（metadata）加载完成事件
+		videoLoadedmetadataEventHandler = (ev: Event) => {
+			const target = ev.target as HTMLVideoElement; // 类型断言
+			const track = target.textTracks[0] as TextTrack | null; // 获取第一个字幕轨道
+			if (track) {
+				this.extTrack(track);
+			}
+
+			if (!isNaN(target.duration)) {
+				const updateTarget = this.videoInfoBox.querySelector('li[data-role="duration"] span');
+				if (updateTarget) {
+					updateTarget.textContent = this.formatSeconds(target.duration);
+				}
+			}
+
+			// 观察 shadow DOM 内部的元素（container）
+			this.resizeObserver.observe(target);
+		};
+
+		// 视频 - 更新进度条
+		videoTimeupdateEventHandler = (ev: Event) => {
+			const target = ev.target as HTMLVideoElement; // 类型断言
+			const progress = (target.currentTime / target.duration) * 100;
+			this.progressBar.value = progress.toString();
+
+			const updateTarget = this.videoInfoBox.querySelector('li[data-role="currentTime"] span');
+			if (updateTarget) {
+				updateTarget.textContent = this.formatSeconds(target.currentTime);
+			}
+		};
+
+		// 视频 - volumechange 事件
+		videoVolumechangeEventHandler = (ev: Event) => {
+			const target = ev.target as HTMLVideoElement; // 类型断言
+			this.muteButton.textContent = target.muted ? "\u{1F507}" : "\u{1F50A}";
+		};
+
+		// 视频 - 右键点击时显示自定义菜单
+		videoContextmenuEventHandler = (ev: MouseEvent) => {
+			ev.preventDefault(); // 防止默认右键菜单
+			const x = ev.pageX; // 获取点击位置的X坐标
+			const y = ev.pageY; // 获取点击位置的Y坐标
+			this.contextMenu.style.left = `${x}px`; // 设置自定义菜单的X位置
+			this.contextMenu.style.top = `${y}px`; // 设置自定义菜单的Y位置
+			this.contextMenu.showPopover();
+		};
+
+		// 菜单事件代理
+		contextMenuClickEventHandler = (ev: Event) => {
+			const target = ev.target as HTMLLIElement; // 类型断言
+			// 确保点击的是 <li> 元素
+			if (target.tagName.toLowerCase() === "li") {
+				// 获取自定义的 data-action 属性
+				const action = target.getAttribute("data-action");
+				// 根据 data-action 值进行不同的操作
+				switch (action) {
+					case "loop": {
+						target.classList.toggle("active");
+						this.videoElement.loop = !this.videoElement.loop;
+						break;
+					}
+					case "save":
+						this.downloadVideo(this.videoElement.currentSrc);
+						break;
+					case "details":
+						target.classList.toggle("active");
+						this.videoInfoBoxVisible = !this.videoInfoBoxVisible;
+						break;
+					default:
+						break;
+				}
+
+				// 隐藏菜单
+				setTimeout(() => this.contextMenu.hidePopover(), 100);
+			}
+		};
+
+		// 用户拖动进度条时更新视频播放时间
+		progressBarInputEventHandler = (ev: Event) => {
+			const target = ev.target as HTMLInputElement; // 类型断言
+			const value = Number(target.value);
+			const seekTime = (value / 100) * this.videoElement.duration;
+			this.videoElement.currentTime = seekTime;
+		};
+
+		// 静音按钮 - 单击事件
+		muteButtonClickEventHandler = (ev: Event) => {
+			this.videoElement.muted = !this.videoElement.muted;
+		};
+
+		// 尺寸调整观察者回调
+		handleResizeObserverCallback = (entries: ResizeObserverEntry[]) => {
 			entries.forEach((entry) => {
 				let realWidth: number, realHeight: number;
 				const { width, height } = entry.contentRect ?? {};
-				const { videoWidth, videoHeight } = this.videoElement ?? {
-					videoWidth: width,
-					videoHeight: height,
-				};
+				const { videoWidth, videoHeight } = this.videoElement ?? {};
 				const videoAspectRatio = videoHeight / videoWidth;
 				const clientAspectRatio = height / width;
 
@@ -325,6 +349,19 @@ customElements.define(
 				const fontSize = Math.max(minSideLength / 10, 12);
 				this.style.fontSize = `${fontSize}px`;
 			});
+		};
+
+		appendControls() {
+			if (this.shadowRoot) {
+				this.shadowRoot.appendChild(this.controlBar);
+				this.controlBar.appendChild(this.progressBar);
+			}
+		}
+
+		removeControls() {
+			if (this.shadowRoot) {
+				this.shadowRoot.removeChild(this.controlBar);
+			}
 		}
 
 		extTrack(track: TextTrack) {

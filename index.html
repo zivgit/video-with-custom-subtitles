@@ -7,6 +7,7 @@
 		<style>
 			video-with-custom-subtitles {
 				width: 1000px;
+				height: 500px;
 			}
 			video-with-custom-subtitles::part(video) {
 				border: 2px solid darkgray;
@@ -16,12 +17,7 @@
 		<script src="/out/videoWithCustomSubtitles.js" defer></script>
 	</head>
 	<body>
-		<video-with-custom-subtitles
-			controls
-			autoplay
-			muted
-			poster="/src/assets/big_buck_bunny_poster.jpg"
-		>
+		<video-with-custom-subtitles controls autoplay muted poster="/src/assets/big_buck_bunny_poster.jpg">
 			<source src="/src/assets/big_buck_bunny_720p_surround.mp4" type="video/mp4" />
 			<track default kind="captions" srclang="cn" src="/src/assets/big_buck_bunny.vtt" />
 
